@@ -1,0 +1,70 @@
+name: Deploy to GitHub Pages
+
+on:
+    push:
+        branches:
+            - demos
+    workflow_dispatch:
+
+permissions:
+    contents: write
+
+jobs:
+    build-and-deploy:
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 20
+
+            #
+            # Build app1
+            #
+            - name: Install dependencies (sphinx-pid-viz)
+              working-directory: sphinx-pid-viz
+              run: npm install
+
+            - name: Build sphinx-pid-viz
+              working-directory: sphinx-pid-viz
+              run: npm run build
+
+            #
+            # Build app2
+            #
+            - name: Install dependencies (filters-demo)
+              working-directory: filters-demo
+              run: npm install
+
+            - name: Build filters-demo
+              working-directory: filters-demo
+              run: npm run build
+
+            #
+            # Prepare deploy directory
+            #
+            - name: Create deploy structure
+              run: |
+                  rm -rf deploy
+                  mkdir -p deploy/sphinx-pid-viz
+                  mkdir -p deploy/filters-demo
+
+            - name: Copy build outputs
+              run: |
+                  cp -r sphinx-pid-viz/dist/* deploy/sphinx-pid-viz/
+                  cp -r filters-demo/dist/* deploy/filters-demo/
+
+            #
+            # Deploy to gh-pages branch
+            #
+            - name: Deploy to GitHub Pages
+              uses: peaceiris/actions-gh-pages@v4
+              with:
+                  github_token: ${{ secrets.GITHUB_TOKEN }}
+                  publish_branch: gh-pages
+                  publish_dir: ./deploy
+                  force_orphan: true
