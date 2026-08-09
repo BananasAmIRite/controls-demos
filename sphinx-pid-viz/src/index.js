@@ -33,7 +33,7 @@ const material = new THREE.MeshPhongMaterial({
     color: 0xaaaaaa, // gray (can also use a CSS color string here)
     side: THREE.DoubleSide,
 });
-const sphinxGeometry = await loader.loadAsync('./public/sphinx.stl');
+const sphinxGeometry = await loader.loadAsync(`${import.meta.env.BASE_URL}sphinx.stl`);
 const sphinx = new THREE.Mesh(sphinxGeometry, material);
 sphinx.position.y = 20;
 sphinx.rotation.y = Math.PI / 4;
