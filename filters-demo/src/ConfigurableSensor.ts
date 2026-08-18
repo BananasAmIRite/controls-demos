@@ -117,6 +117,9 @@ export default class ConfigurableSensor extends Sensor {
     }
 
     read(): number {
+        if (this.frequencyEnabledInput.checked) {
+            return this.trueValue;
+        }
         return this.trueValue + getGaussianNoise(this.noiseMean, this.noiseStdDev);
     }
 
