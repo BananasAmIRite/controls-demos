@@ -45,6 +45,17 @@ jobs:
               run: npm run build
 
             #
+            # Build app2
+            #
+            - name: Install dependencies (kalman-demo)
+              working-directory: kalman-demo
+              run: npm install
+
+            - name: Build kalman-demo
+              working-directory: kalman-demo
+              run: npm run build
+
+            #
             # Prepare deploy directory
             #
             - name: Create deploy structure
@@ -52,11 +63,13 @@ jobs:
                   rm -rf deploy
                   mkdir -p deploy/sphinx-pid-viz
                   mkdir -p deploy/filters-demo
+                  mkdir -p deploy/kalman-demo
 
             - name: Copy build outputs
               run: |
                   cp -r sphinx-pid-viz/dist/* deploy/sphinx-pid-viz/
                   cp -r filters-demo/dist/* deploy/filters-demo/
+                  cp -r kalman-demo/dist/* deploy/kalman-demo/
 
             #
             # Deploy to gh-pages branch
