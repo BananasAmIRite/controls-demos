@@ -6,9 +6,6 @@ import PIDController from './pid.js';
 import { compute, deltaTime } from 'three/tsl';
 import PositionGraph from './PositionGraph.js';
 
-const ENABLE_PID = true;
-const ENABLE_FF = true;
-
 // I OVERSATURATED - 5, 0.5, 3
 // PERFECT (PID) - 5, 0.15, 3
 // PERFECT (PDFF) - 5, 0, 3, 9.81
@@ -133,6 +130,13 @@ const controls = new OrbitControls(camera, renderer.domElement);
 
 // 2. Initialize the GUI panel
 const gui = new GUI({ title: 'Controls Menu' });
+const featureGui = new GUI({ title: 'Feature Options' });
+featureGui.domElement.style.top = '220px';
+
+const featureSettings = {
+    enablePid: true,
+    enableFf: true,
+};
 
 const graph = new PositionGraph(
     {
@@ -149,7 +153,7 @@ const errorGraph = new PositionGraph(
         height: 125,
         title: 'Error vs Time',
     },
-    { enabled: ENABLE_PID, left: '10px', bottom: '10px' },
+    { enabled: featureSettings.enablePid, left: '10px', bottom: '10px' },
 );
 
 const pGraph = new PositionGraph(
@@ -158,7 +162,7 @@ const pGraph = new PositionGraph(
         height: 125,
         title: 'P Output vs Time',
     },
-    { left: '320px', bottom: '10px', enabled: ENABLE_PID },
+    { left: '320px', bottom: '10px', enabled: featureSettings.enablePid },
 );
 const iGraph = new PositionGraph(
     {
@@ -166,7 +170,7 @@ const iGraph = new PositionGraph(
         height: 125,
         title: 'I Output vs Time',
     },
-    { left: '630px', bottom: '10px', enabled: ENABLE_PID },
+    { left: '630px', bottom: '10px', enabled: featureSettings.enablePid },
 );
 
 const dGraph = new PositionGraph(
@@ -175,7 +179,7 @@ const dGraph = new PositionGraph(
         height: 125,
         title: 'D Output vs Time',
     },
-    { left: '940px', bottom: '10px', enabled: ENABLE_PID },
+    { left: '940px', bottom: '10px', enabled: featureSettings.enablePid },
 );
 
 const controller = new PIDController();
@@ -221,8 +225,58 @@ const controllerSettings = {
     runController: false,
 };
 
+// --- URL load/save ---
+
+const getSettingsForUrl = () => ({
+    targetPos: controllerSettings.targetPos,
+    bbgain: controllerSettings.bbgain,
+    kP: controllerSettings.kP,
+    kI: controllerSettings.kI,
+    kD: controllerSettings.kD,
+    ffgain: controllerSettings.ffgain,
+    runController: controllerSettings.runController,
+    enablePid: featureSettings.enablePid,
+    enableFf: featureSettings.enableFf,
+});
+
+const loadSettingsFromUrl = () => {
+    const encodedSettings = new URLSearchParams(window.location.search).get('opts');
+    if (!encodedSettings) return;
+
+    try {
+        const settings = JSON.parse(atob(encodedSettings));
+        const numericSettings = ['targetPos', 'bbgain', 'kP', 'kI', 'kD', 'ffgain'];
+
+        if (numericSettings.every((key) => Number.isFinite(settings[key]))) {
+            numericSettings.forEach((key) => {
+                controllerSettings[key] = settings[key];
+            });
+        }
+
+        if (typeof settings.runController === 'boolean') {
+            controllerSettings.runController = settings.runController;
+        }
+        if (typeof settings.enablePid === 'boolean') {
+            featureSettings.enablePid = settings.enablePid;
+        }
+        if (typeof settings.enableFf === 'boolean') {
+            featureSettings.enableFf = settings.enableFf;
+        }
+    } catch (error) {
+        console.warn('Unable to load controller settings from URL.', error);
+    }
+};
+
+const copySettingsLink = async () => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('opts', btoa(JSON.stringify(getSettingsForUrl())));
+    await navigator.clipboard.writeText(url.toString());
+};
+
+loadSettingsFromUrl();
+
 const computeOutput = (dt) => {
-    if (ENABLE_PID) {
+    if (featureSettings.enablePid) {
         controller.p = controllerSettings.kP;
         controller.i = controllerSettings.kI;
         controller.d = controllerSettings.kD;
@@ -236,19 +290,32 @@ const computeOutput = (dt) => {
         };
     }
 };
+const setPidGraphsEnabled = (enabled) => {
+    [errorGraph, pGraph, iGraph, dGraph].forEach((graphToUpdate) => {
+        graphToUpdate.enabled = enabled;
+        graphToUpdate.canvas.style.display = enabled ? 'block' : 'none';
+    });
+};
+
+featureGui
+    .add(featureSettings, 'enablePid')
+    .name('Enable PID')
+    .onChange((enabled) => {
+        setPidGraphsEnabled(enabled);
+        controller.reset();
+    });
+featureGui.add(featureSettings, 'enableFf').name('Enable Feedforward');
+featureGui.add({ copySettingsLink }, 'copySettingsLink').name('Copy Settings Link');
+setPidGraphsEnabled(featureSettings.enablePid);
+
 // 3. Add regular controllers (target object, property name)
 gui.add(controllerSettings, 'targetPos', 10, 100, 1).name('Target Y Position');
 
-if (ENABLE_PID) {
-    gui.add(controllerSettings, 'kP', 0, 5, 0.001).name('kP');
-    gui.add(controllerSettings, 'kI', 0, 1, 0.001).name('kI');
-    gui.add(controllerSettings, 'kD', 0, 5, 0.001).name('kD');
-} else {
-    gui.add(controllerSettings, 'bbgain', 0, 20).name('Bang-Bang Gain');
-}
-if (ENABLE_FF) {
-    gui.add(controllerSettings, 'ffgain', 0, 15).name('Feedforward Gain');
-}
+gui.add(controllerSettings, 'kP', 0, 5, 0.001).name('kP');
+gui.add(controllerSettings, 'kI', 0, 1, 0.001).name('kI');
+gui.add(controllerSettings, 'kD', 0, 5, 0.001).name('kD');
+gui.add(controllerSettings, 'bbgain', 0, 20).name('Bang-Bang Gain');
+gui.add(controllerSettings, 'ffgain', 0, 15).name('Feedforward Gain');
 gui.add(controllerSettings, 'reset').name('Reset Controller');
 gui.add(controllerSettings, 'runController').name('Running Controller?');
 
@@ -266,7 +333,9 @@ function animate(time) {
         const friction = 0.05 * Math.pow(sphinxState.velocity, 2) * Math.sign(sphinxState.velocity);
 
         sphinxState.acceleration =
-            -9.81 + Math.min(Math.max(output.output + controllerSettings.ffgain, -100), 100) - friction;
+            -9.81 +
+            Math.min(Math.max(output.output + (featureSettings.enableFf ? controllerSettings.ffgain : 0), -100), 100) -
+            friction;
         console.log(sphinxState.acceleration);
         sphinxState.velocity += sphinxState.acceleration * deltaTime;
         sphinxState.position += sphinxState.velocity * deltaTime;
